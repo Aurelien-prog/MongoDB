@@ -164,11 +164,133 @@ db.runCommand(
 - $lt -> inférieur à ...
 - $lte -> inférieur ou égal à ...
 - $in /  $nin -> absence ou présence de ...
+- $eq -> égale à ...
 
 ## Les opérateurs logiques
 
 - $and -> et
-- 
+
+## L'opérateur $expr
+
+Il permet d'utiliser des expressions dans nos requêtes. Ces expressions pourront contenir des operateurs, des objets ou encore des chemins d'objet pointant vers des champs.
+
+```javascript
+// Requête affichant le nom des personnes dont la longueur du nom multiplié par 12 est supérieur à leur âge.
+db.personnes.find({
+	"nom": { $exists: 1},
+	"age": { $exists: 1 },
+	$expr: { $gt: [ { $multiply: [ { $strLenCP: "$nom" }, 12 ] }, "$age" ] } 
+},
+{ // Projection
+	"nom": 1,
+	"_id": 0
+})
+```
+
+```javascript
+// Requête permettant d'afficher les comptes dont la sommes des opérations de débit est supérieur au montant du crédit.
+db.banque.find({
+	"debit": {$exists: 1},
+	$expr: {
+		$gt: [
+			{ $sum: "$debit" },
+			"$credit"
+		]
+	}
+})
+```
+
+## L'opérateur $type
+
+```javascript
+{ champ: { $type: < type BSON > } }
+```
+
+```javascript
+db.personnes.insertOne({
+	"nom": "Zidane", "prenom": "Z", "age": numberInt(50)
+})
+```
+
+## L'opérateur $mod
+
+```javascript
+{ champ: { $mod: [diviseur, reste ] } }
+```
+
+## L'opérateur $where
+
+```javascript
+db.personnes.find ({ $where: "this.nom.length > 6" })
+
+db.personnes.find ({ $where: function() {
+	return obj.nom.length > 6
+} })
+```
+
+## Les opérateurs de tableau
+
+```javascript
+{ $push: { <champ>: <valeur>, ... } }
+{ $pull: { <champ>: <valeur>, ... } }
+
+db.hobbies.updateOne ({ "nom": "Yves" }, { $push: { "passions": "Line" } })
+```
+
+## L'opérateur $addToSet
+
+```javascript
+db.personnes.find({ "interets": "jardinage" })
+// Requêtes permettant d'afficher les personnes ayant l'un des deux interets (peu importe l'ordre.)
+db.personnes.find({ "interets": { $all : [ "bridge", "jardinage" ] } })
+
+db.personnes.find({ "interets.1": "jardinage" })
+// Récupère les personnes ayant deux interets exactement.
+db.personnes.find({ "interets": { $size: 2 } })
+// Récupère les personnes ayant au moins deux interets.
+db.personnes.find({ "interets.1": { $exists:1 } })
+```
+
+## L'opérateur $elemMatch
+
+```javascript
+db.eleves.find({ "notes": { $elemMatch: { $gt: 0, $lt: 10 } }})
+// Affiche les élèves ayant une note entre 5 et 18.50.
+db.eleves.find({ "notes": { $all: [5, 7.50] } })
+```
+
+## Les tableaux de documents
+
+```javascript
+db.eleves.find({ "notes.note": 10 })
+```
+
+Renvoyer les documents dont les élèves ont au moins une note entre 10 et 15 dans une matière quelqconque :
+
+```javascript
+db.eleves.find({
+	"notes" : { 
+		$elemMatch: { 
+			"note": { $gt: 10, $lte: 15 }
+		} 
+	} 
+})
+
+db.eleve.find({  })
+
+db.eleves.find({ "notes.0.note": { $lt: 10 } })
+```
+
+## Le tri
+
+```javascript
+curseur.sort( <tri> )
+```
+
+
+
+
+
 
 
 # /////////////////////////////////////////////////////////////////////////
