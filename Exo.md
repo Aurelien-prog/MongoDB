@@ -129,7 +129,7 @@ db.salles.find({ $expr: { $gt: [ { $multiply: [ "$_id", 100 ] }, "$capacite" ] }
 {  nom: 'Sonograf',  capacite: 200}
 ```
 
-# 12. A faire
+# 12.
 ```javascript
 db.salles.find({ $where: function() { return obj.smac }}, { "nom": 1, "_id": 0 })
 // L'expression "$where" est utilisé pour pouvoir se servir du javascript dans cette requête.

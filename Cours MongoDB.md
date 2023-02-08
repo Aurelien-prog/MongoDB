@@ -287,13 +287,368 @@ db.eleves.find({ "notes.0.note": { $lt: 10 } })
 curseur.sort( <tri> )
 ```
 
+# Les index
+
+La nature de votre application devra impacter votre logique d'indexation : 
+Est-elle orientée écriture (write-heavy) ? ou lecture (read-heavy) ?
+
+```javascript
+db.collection.createIndex(<champ + type>, <options?>)
+
+db.collection.createIndex({ "age": -1 })
+{
+	"createCollectionAutomatically": false,
+	"numIndexesBefore": 1,
+	..
+	ok:1
+}
+
+db.personnes.getIndexes()
+// Retourne un tableau
+
+db.personnes.dropIndex( "age_-1" )
+db.personnes.createIndex({ "age": -1 }, { "name": "index_age" })
+```
+
+Un index peut porter sur plus d'un champ :
+C'est ce qu'on appelle un index composé.
+
+```javascript
+db.personnes.createIndex({ "age": })
+```
+
+MongoDB permet l'utilisation de deux types d'Index qui permettent de gérer les requêtes géospatiales :
+- Les indexs de type `2dsphere` sont utilisés par des requêtes géospatiales intervenant sur une surface sphérique.
+- Les indexs `2d` concernent des requêtes intervenant sur un plan Euclidien.
+
+Pour un champ nommé `donneesSpatiales` d'une collection `cartographie` vous pouvez par exemple créer un index de type `2d` avec la commande :
+
+``` javascript
+db.cartographie.createIndex({ "donneesSpatiales": "2d" })
+```
+
+Pour la création d'un index `2dsphere` on utilisera plutôt :
+
+```javascript
+db.cartographie.createIndex({ "donneesSpatiales": "2dsphere" })
+```
+
+Les indexs 2d font intervenir dess coordonnées de type `legacy`
+
+```javascript
+db.plan.insertOne({ "nom": "firstPoint", "geodata": [1, 1] })
+
+db.plan.insertOne({ "nom": "firstPoint_bis", "geodata": [4.7, 44.5] })
+
+db.plan.insertOne({ "nom": "firstPoint_bis", "geodata": [ "lon": 4.7, "lat": 44.5] })
+```
+
+## Les objets GeoJSON
+
+```javascript
+{ type: <type d_objet>, coordinates: <coordonnees> }
+```
+
+### Le type Point
+
+```javascript
+{ 
+	"type": "Point", 
+	"coordinates": [ 14.0, 1.0 ]
+}
+```
+
+### Le type MultiPoint
+
+```javascript
+{
+	"type": "MultiPoint",
+	"coordinates": [
+		[13.0, 1.0], [13.0, 3.0]
+	]
+}
+```
+
+### Le type LineString
+
+```javascript
+{
+	"type": "LineString",
+	"coordinates": [
+		[13.0, 1.0], [13.0, 3.0]
+	]
+}
+```
+
+### Le type Polygon
+
+```javascript
+{
+	"type": "Polygon",
+	"coordinates": [
+		[13.0, 1.0], [13.0, 3.0]
+	]
+	[
+		[13.0, 1.0], [13.0, 3.0]
+	]
+}	
+```
+
+#### Création d'index
+
+```javascript
+db.avignon.createIndex({ "localisation": "2dsphere" })
+
+db.avignon2d.createIndex({ "localisation": "2d" })
+```
+
+## L'opérateur $nearSphere
+
+```javascript
+{
+	$nearSphere: {
+		$geometry: {
+			type: "Point",
+			coordinates: [<longitude>, <latitude>]
+		},
+		$minDistance: <distance en metres>,
+		$maxDistance: <distance en metres>
+	}
+}
+
+{
+	$nearSphere: [ <x>, <y> ],
+	$minDistance: <distance en radians>,
+	$maxDistance: <distance en radians>
+}
+```
+
+```javascript
+var opera = { type: "Point", coordinates: [43.949749, 4.805325]}
+
+//Requête sur la collection avignon
+db.avignon.find(
+	{
+		"localisation": {
+			$nearSphere: {
+				$geometry: opera
+			}	
+		}
+	}, { "_id": 0, "nom": 1 }
+)
+```
+
+## L'opérateur $geoWithin
+Cet opérateur n'effectue aucun tri et ne necessite pas la création d'un index geospatiale, on l'utilise de la manière suivante:
+
+```javascript
+{
+	<champ des documents contenant les coordonnées>: {
+		$geoWithin: {
+			<operateur de forme>: <coordonnees>
+		}
+	}
+}
+```
+
+Création d'un polygone de notre exemple :
+```javascript
+var polygone = [
+	[43.9548, 4.80143],
+	[43.95475, 4.80779],
+	[43.95045, 4.81097],
+	[43.4657, 4.80449],
+]
+```
+
+La requête suivante utilise ce polygone :
+```javascript
+db.avignon2d.find(
+	{
+		"localisation": {
+			$geoWithin: {
+				$polygon: polygone
+			}
+		}
+	}, { "_id": 0, "nom": 1 }	
+)
+```
+
+## Signature pour le cas d'utilisation d'objets GeoJSON
+
+```javascript
+{
+	<champ des documents contenant les coordonnées>: {
+		$geoWithin: {
+			type: < "Polygon" ou bien "MultiPolygon" >,
+			coordinates: [<coordonnees>]
+		}
+	}
+}
+```
+
+```javascript
+var polygone = [
+	[43.9548, 4.80143],
+	[43.95475, 4.80779],
+	[43.95045, 4.81097],
+	[43.4657, 4.80449],
+]
+
+db.avignon2d.find(
+	{
+		"localisation": {
+			$geoWithin: {
+				$geometry: {
+					type: "Polygon",
+					coordinates: [polygone]
+				}
+			}
+		}
+	},	{ "_id": 0, "nom": 1 }
+)
+```
+
+## Le framework d'agrégation
+
+MongoDB met à disposition un puissant outil d'analyse et de traitement de l'information: 
+Le pipeline d'agreagation (ou framework)
+
+Métaphore du tapis roulant d'usine.
+
+Méthode utilisée :
+```javascript
+db.collection.aggregate(pipeline, options)
+```
+
+- pipeline : désigne un tableau d'étapes
+- options : désigne un document
+
+Parmis les options, nous retiendrons :
+
+- Les collations, permet d'affecter une collation à l'opération d'aggrégation.
+- bypassDocumentValidation : Fonctionne avec un opérateur appelé `$out` et permet de passer au travers de la validation des documents.
+- allowDiskUse : Donne la possibilité de faire déborder les opérations d'écriture sur le disque.
+
+Vous pouvez appeler aggregate sans arguments : 
+```javascript
+db.personnes.aggregate()
+```
+
+Au sein du `shell`, nous allons créer une variable pipeline :
+```javascript
+var pipeline = []
+
+db.personnes.aggregate(pipeline)
+db.personnes.aggregate(
+	pipeline, {
+		"collation": { "locale": "fr" }
+	}
+)
+```
+
+## L'opérateur $addFilds
+
+```javascript
+{ $addFields: { <nouveau champ> : <expression>, ... } }
+
+db.personnes.aggregate([
+	{
+		$addFields: {
+			"numero_secu_s": ""
+		}
+	}
+])
+ 
+ db.personnes.aggregate([
+	{
+		$project: {
+			......
+			"numero_secu_s": 1
+		}
+	}
+])
+```
+
+
+## L'opérateur $group
+```javascript
+{
+	$group: {
+		"_id": <expression>,
+		<champ>: { <operateur d_accumulation> }
+	}
+}
+```
+
+Opérateur d'accumulation: `$push`, `$sum`, `$avg`, `$min`, `$max`.
+
+```javascript
+var pipeline = [{
+	$group: {
+		"_id": "age",
+		"nombre_personnes": { $sum: 1 }
+	}
+},
+{
+	$sort: {
+		"nombre_personnes": 1
+	}
+}]
+
+db.personnes.aggregate(pipeline)
+
+
+db.personnes.aggregate([
+	{
+		$sortByCount: "$age"
+	}
+])
+
+
+var pipeline = [{
+	$group: {
+		"_id": null,
+		"nombre_personnes": { $sum: 1 }
+	}
+}]
+
+
+var pipeline = [
+	{
+		$match: {
+			"age": { $exists: true }
+		}
+	},
+	{
+		$group: {
+			"_id": null,
+			"$avg": {
+				$avg: "$age"
+			}
+		}
+	},
+	{
+		$project: {
+			"_id": 0,
+			"age_moyen": {
+				"$ceil": "$avg"
+			}
+		}
+	}
+]
+```
 
 
 
 
 
 
-# /////////////////////////////////////////////////////////////////////////
+
+
+
+
+# ///////////////////////////////////////////
 
 
 # Travail à faire :
