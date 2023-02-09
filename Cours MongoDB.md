@@ -424,7 +424,7 @@ db.avignon2d.createIndex({ "localisation": "2d" })
 ```
 
 ```javascript
-var opera = { type: "Point", coordinates: [43.949749, 4.805325]}
+var opera = { type: "Point", coordinates: [43.949749, 4.805325] }
 
 //Requête sur la collection avignon
 db.avignon.find(
