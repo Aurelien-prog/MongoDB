@@ -21,7 +21,7 @@ db.Business.find({
 
 # 2.
 ## Les restaurants ouverts à partir de 18H
-## a. A finir
+## a.
 ```js
 db.business.find({ $or: 
 	[ 
